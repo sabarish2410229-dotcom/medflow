@@ -7,6 +7,7 @@ import models  # noqa: F401  (needed so tables register with Base before create_
 from routers import auth as auth_router
 from routers import inventory as inventory_router
 from routers import procurement as procurement_router
+from routers import orders as orders_router
 
 app = FastAPI(title="MedFlow API")
 
@@ -24,6 +25,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(auth_router.router)
 app.include_router(inventory_router.router)
+app.include_router(orders_router.router)
 app.include_router(procurement_router.router)
 
 
