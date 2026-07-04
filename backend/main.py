@@ -5,6 +5,7 @@ from database import engine, Base
 import models  # noqa: F401  (needed so tables register with Base before create_all)
 
 from routers import auth as auth_router
+from routers import inventory as inventory_router
 
 app = FastAPI(title="MedFlow API")
 
@@ -21,6 +22,7 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 app.include_router(auth_router.router)
+app.include_router(inventory_router.router)
 
 
 @app.get("/")
