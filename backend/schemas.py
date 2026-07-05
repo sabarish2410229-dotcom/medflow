@@ -11,6 +11,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: RoleEnum
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -23,6 +25,8 @@ class UserOut(BaseModel):
     name: str
     email: EmailStr
     role: RoleEnum
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -84,11 +88,13 @@ class SupplierOption(BaseModel):
 class RecommendationResult(BaseModel):
     dealer_id: int
     dealer_name: str
+    dealer_phone: Optional[str] = None
+    dealer_address: Optional[str] = None
     inventory_id: int
+    medicine_id: int
     price: float
     score: float
     reasons: List[str]
-
 
 # ---------- ORDERS ----------
 

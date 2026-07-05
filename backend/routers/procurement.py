@@ -66,4 +66,12 @@ def search_and_recommend(
         db.add(log_entry)
         db.commit()
 
+    dealer_lookup = {item.owner.id: item.owner for item in dealer_stocks}
+
+    for r in ranked_results:
+        r["medicine_id"] = medicine.id
+        dealer = dealer_lookup.get(r["dealer_id"])
+        r["dealer_phone"] = dealer.phone if dealer else None
+        r["dealer_address"] = dealer.address if dealer else None
+
     return ranked_results
