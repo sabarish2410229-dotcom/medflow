@@ -150,6 +150,9 @@ class OrderStatusUpdate(BaseModel):
 class ExchangeListingOut(BaseModel):
     id: int
     owner_id: int
+    owner_name: str
+    owner_phone: Optional[str] = None
+    owner_address: Optional[str] = None
     medicine: MedicineOut
     price: float
     stock: int

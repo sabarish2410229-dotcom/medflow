@@ -28,17 +28,30 @@ def browse_near_expiry_listings(
     listings = (
         db.query(Inventory)
         .filter(
-            Inventory.is_dealer_stock == False,          # only pharmacy stock, not dealer stock
-            Inventory.owner_id != current_user.id,         # not your own listings
+            Inventory.is_dealer_stock == False,
+            Inventory.owner_id != current_user.id,
             Inventory.expiry_date != None,
             Inventory.expiry_date <= cutoff_date,
-            Inventory.expiry_date >= date.today(),          # not already expired
+            Inventory.expiry_date >= date.today(),
             Inventory.stock > 0,
         )
         .all()
     )
-    return listings
 
+    results = []
+    for item in listings:
+        results.append({
+            "id": item.id,
+            "owner_id": item.owner_id,
+            "owner_name": item.owner.name,
+            "owner_phone": item.owner.phone,
+            "owner_address": item.owner.address,
+            "medicine": item.medicine,
+            "price": item.price,
+            "stock": item.stock,
+            "expiry_date": item.expiry_date,
+        })
+    return results
 
 @router.get("/mine", response_model=List[ExchangeListingOut])
 def my_near_expiry_listings(
@@ -63,8 +76,21 @@ def my_near_expiry_listings(
         )
         .all()
     )
-    return listings
 
+    results = []
+    for item in listings:
+        results.append({
+            "id": item.id,
+            "owner_id": item.owner_id,
+            "owner_name": item.owner.name,
+            "owner_phone": item.owner.phone,
+            "owner_address": item.owner.address,
+            "medicine": item.medicine,
+            "price": item.price,
+            "stock": item.stock,
+            "expiry_date": item.expiry_date,
+        })
+    return results
 
 @router.post("/{inventory_id}/purchase", response_model=OrderOut)
 def purchase_near_expiry_stock(

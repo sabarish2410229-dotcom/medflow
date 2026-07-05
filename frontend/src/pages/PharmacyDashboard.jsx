@@ -1,11 +1,22 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getMyInventory, addInventory, deleteInventory, searchAndRecommend, createOrder } from "../api";
+import {
+  getMyInventory,
+  addInventory,
+  deleteInventory,
+  searchAndRecommend,
+  createOrder,
+  getMyOrders,
+  getOrderTracking,
+} from "../api";
 import InventoryTable from "../components/InventoryTable";
 import RecommendationCard from "../components/RecommendationCard";
+import OrderTimeline from "../components/OrderTimeline";
 
 export default function PharmacyDashboard() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("inventory");
 
   return (
@@ -27,11 +38,29 @@ export default function PharmacyDashboard() {
         <TabButton active={activeTab === "search"} onClick={() => setActiveTab("search")}>
           Search & Recommend
         </TabButton>
+        <TabButton active={activeTab === "orders"} onClick={() => setActiveTab("orders")}>
+          My Orders
+        </TabButton>
+        <button
+          onClick={() => navigate("/exchange")}
+          style={{
+            padding: "8px 16px",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            background: "#f59e0b",
+            color: "#fff",
+            fontWeight: "600",
+          }}
+        >
+          Near-Expiry Exchange →
+        </button>
       </div>
 
       <div style={{ marginTop: "20px" }}>
         {activeTab === "inventory" && <InventoryTab />}
         {activeTab === "search" && <SearchTab />}
+        {activeTab === "orders" && <OrdersTab />}
       </div>
     </div>
   );
@@ -178,6 +207,7 @@ function SearchTab() {
       setOrderMsg(err.response?.data?.detail || "Order failed");
     }
   };
+
   return (
     <div style={styles.section}>
       <h3>Search Medicine & Get Recommendations</h3>
@@ -200,6 +230,91 @@ function SearchTab() {
         {!loading && results.map((r, i) => (
           <RecommendationCard key={r.inventory_id} result={r} rank={i + 1} onOrder={handleOrder} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function OrdersTab() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [tracking, setTracking] = useState([]);
+  const [loadingTracking, setLoadingTracking] = useState(false);
+
+  const loadOrders = async () => {
+    try {
+      const res = await getMyOrders();
+      setOrders(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const viewTracking = async (order) => {
+    setSelectedOrder(order);
+    setLoadingTracking(true);
+    try {
+      const res = await getOrderTracking(order.id);
+      setTracking(res.data);
+    } catch (err) {
+      setTracking([]);
+    } finally {
+      setLoadingTracking(false);
+    }
+  };
+
+  if (loading) return <div style={styles.section}><p>Loading orders...</p></div>;
+
+  return (
+    <div style={{ display: "flex", gap: "20px" }}>
+      <div style={{ ...styles.section, flex: 1, marginTop: 0 }}>
+        <h3>My Orders</h3>
+        {orders.length === 0 && <p style={{ color: "#666" }}>No orders yet.</p>}
+        {orders.map((order) => (
+          <div
+            key={order.id}
+            onClick={() => viewTracking(order)}
+            style={{
+              padding: "12px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "6px",
+              marginTop: "10px",
+              cursor: "pointer",
+              background: selectedOrder?.id === order.id ? "#eff6ff" : "#fff",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <strong>Order #{order.id}</strong>
+              <span style={{
+                fontSize: "12px",
+                padding: "2px 8px",
+                borderRadius: "10px",
+                background: order.status === "delivered" ? "#dcfce7" : "#fef9c3",
+                color: order.status === "delivered" ? "#166534" : "#854d0e",
+              }}>
+                {order.status}
+              </span>
+            </div>
+            <p style={{ fontSize: "13px", color: "#666", margin: "6px 0 0" }}>
+              {order.order_type === "exchange" ? "Near-Expiry Exchange" : "Procurement"} ·{" "}
+              {order.items.map((i) => `${i.medicine.name} x${i.quantity}`).join(", ")}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...styles.section, flex: 1, marginTop: 0 }}>
+        <h3>Tracking</h3>
+        {!selectedOrder && <p style={{ color: "#666" }}>Select an order to see its tracking history.</p>}
+        {selectedOrder && loadingTracking && <p>Loading tracking...</p>}
+        {selectedOrder && !loadingTracking && <OrderTimeline events={tracking} />}
       </div>
     </div>
   );
