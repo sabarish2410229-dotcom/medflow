@@ -132,6 +132,8 @@ class OrderOut(BaseModel):
     id: int
     buyer_id: int
     seller_id: int
+    seller_name: Optional[str] = None
+    buyer_name: Optional[str] = None
     status: OrderStatusEnum
     order_type: OrderTypeEnum
     created_at: datetime

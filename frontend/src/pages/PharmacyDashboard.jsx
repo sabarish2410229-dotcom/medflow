@@ -359,6 +359,9 @@ function OrdersTab() {
               {order.order_type === "exchange" ? "Near-Expiry Exchange" : "Procurement"} ·{" "}
               {order.items.map((i) => `${i.medicine.name} x${i.quantity}`).join(", ")}
             </p>
+            <p style={{ fontSize: "12px", color: "#888", margin: "4px 0 0" }}>
+              From: {order.seller_name || "Unknown"}
+            </p>
           </div>
         ))}
       </div>

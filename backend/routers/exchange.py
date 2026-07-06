@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Inventory, Order, OrderItem, TrackingEvent, OrderStatusEnum, OrderTypeEnum
 from schemas import ExchangeListingOut, OrderOut
-from auth import get_current_user
+from auth import get_current_user, require_role
 
 router = APIRouter(prefix="/exchange", tags=["Exchange"])
 
@@ -17,7 +17,7 @@ EXPIRY_WINDOW_DAYS = 90
 @router.get("/listings", response_model=List[ExchangeListingOut])
 def browse_near_expiry_listings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("pharmacy")),
 ):
     """
     Shows near-expiry medicines listed by OTHER pharmacies (not your own),
@@ -56,7 +56,7 @@ def browse_near_expiry_listings(
 @router.get("/mine", response_model=List[ExchangeListingOut])
 def my_near_expiry_listings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("pharmacy")),
 ):
     """
     Shows YOUR OWN pharmacy stock that has entered the near-expiry window —
@@ -97,7 +97,7 @@ def purchase_near_expiry_stock(
     inventory_id: int,
     quantity: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("pharmacy")),
 ):
     """
     Buy near-expiry stock from another pharmacy. Reuses the same Order +

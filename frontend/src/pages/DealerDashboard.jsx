@@ -151,6 +151,7 @@ const NEXT_STATUS = {
   dispatched: "out_for_delivery",
   out_for_delivery: "delivered",
   delivered: null,
+  cancelled: null,
 };
 
 const STATUS_BUTTON_LABEL = {
@@ -209,7 +210,6 @@ function IncomingOrdersTab({ currentUserId }) {
     try {
       await updateOrderStatus(order.id, nextStatus);
       await loadOrders();
-      // Refresh tracking view if this order is currently selected
       if (selectedOrder?.id === order.id) {
         const res = await getOrderTracking(order.id);
         setTracking(res.data);
@@ -217,6 +217,25 @@ function IncomingOrdersTab({ currentUserId }) {
       }
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to update status");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleCancelOrder = async (order) => {
+    if (!window.confirm(`Cancel order #${order.id}? This will restore your reserved stock.`)) return;
+    setUpdating(true);
+    setError("");
+    try {
+      await updateOrderStatus(order.id, "cancelled");
+      await loadOrders();
+      if (selectedOrder?.id === order.id) {
+        const res = await getOrderTracking(order.id);
+        setTracking(res.data);
+        setSelectedOrder({ ...order, status: "cancelled" });
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to cancel order");
     } finally {
       setUpdating(false);
     }
@@ -250,25 +269,45 @@ function IncomingOrdersTab({ currentUserId }) {
                 fontSize: "12px",
                 padding: "2px 8px",
                 borderRadius: "10px",
-                background: order.status === "delivered" ? "#dcfce7" : "#fef9c3",
-                color: order.status === "delivered" ? "#166534" : "#854d0e",
+                background:
+                  order.status === "delivered" ? "#dcfce7" :
+                  order.status === "cancelled" ? "#fee2e2" :
+                  "#fef9c3",
+                color:
+                  order.status === "delivered" ? "#166534" :
+                  order.status === "cancelled" ? "#b91c1c" :
+                  "#854d0e",
               }}>
                 {order.status}
               </span>
             </div>
-            <p style={{ fontSize: "13px", color: "#666", margin: "6px 0 10px" }}>
+            <p style={{ fontSize: "13px", color: "#666", margin: "6px 0 4px" }}>
               {order.order_type === "exchange" ? "Near-Expiry Exchange" : "Procurement"} ·{" "}
               {order.items.map((i) => `${i.medicine.name} x${i.quantity}`).join(", ")}
             </p>
-            {NEXT_STATUS[order.status] && (
-              <button
-                onClick={() => handleAdvanceStatus(order)}
-                disabled={updating}
-                style={styles.advanceBtn}
-              >
-                {updating ? "Updating..." : STATUS_BUTTON_LABEL[order.status]}
-              </button>
-            )}
+            <p style={{ fontSize: "12px", color: "#888", margin: "0 0 10px" }}>
+              From: {order.buyer_name || "Unknown"}
+            </p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {NEXT_STATUS[order.status] && (
+                <button
+                  onClick={() => handleAdvanceStatus(order)}
+                  disabled={updating}
+                  style={styles.advanceBtn}
+                >
+                  {updating ? "Updating..." : STATUS_BUTTON_LABEL[order.status]}
+                </button>
+              )}
+              {(order.status === "created" || order.status === "accepted") && (
+                <button
+                  onClick={() => handleCancelOrder(order)}
+                  disabled={updating}
+                  style={styles.cancelBtn}
+                >
+                  Cancel Order
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -287,6 +326,7 @@ const styles = {
   input: { padding: "8px", border: "1px solid #ccc", borderRadius: "4px", fontSize: "14px" },
   addBtn: { padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" },
   advanceBtn: { padding: "6px 12px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "13px" },
+  cancelBtn: { padding: "6px 12px", background: "#dc2626", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "13px" },
   section: { marginTop: "20px", background: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
   error: { background: "#fee2e2", color: "#b91c1c", padding: "10px", borderRadius: "4px", marginTop: "10px" },
 };

@@ -12,13 +12,27 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 
 # Defines which status can move to which next status — this is the "state machine"
 VALID_TRANSITIONS = {
-    OrderStatusEnum.created: [OrderStatusEnum.accepted],
-    OrderStatusEnum.accepted: [OrderStatusEnum.packed],
+    OrderStatusEnum.created: [OrderStatusEnum.accepted, OrderStatusEnum.cancelled],
+    OrderStatusEnum.accepted: [OrderStatusEnum.packed, OrderStatusEnum.cancelled],
     OrderStatusEnum.packed: [OrderStatusEnum.dispatched],
     OrderStatusEnum.dispatched: [OrderStatusEnum.out_for_delivery],
     OrderStatusEnum.out_for_delivery: [OrderStatusEnum.delivered],
-    OrderStatusEnum.delivered: [],  # final state, no further transitions
+    OrderStatusEnum.delivered: [],
+    OrderStatusEnum.cancelled: [],  # final state
 }
+
+def enrich_order(order: Order) -> dict:
+    return {
+        "id": order.id,
+        "buyer_id": order.buyer_id,
+        "seller_id": order.seller_id,
+        "seller_name": order.seller.name if order.seller else None,
+        "buyer_name": order.buyer.name if order.buyer else None,
+        "status": order.status,
+        "order_type": order.order_type,
+        "created_at": order.created_at,
+        "items": order.items,
+    }
 
 
 @router.post("/", response_model=OrderOut)
@@ -86,13 +100,14 @@ def get_my_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return (
+    orders = (
         db.query(Order)
         .filter(
             (Order.buyer_id == current_user.id) | (Order.seller_id == current_user.id)
         )
         .all()
     )
+    return [enrich_order(o) for o in orders]
 
 
 @router.get("/{order_id}", response_model=OrderOut)
@@ -106,8 +121,7 @@ def get_order(
         raise HTTPException(status_code=404, detail="Order not found")
     if current_user.id not in (order.buyer_id, order.seller_id):
         raise HTTPException(status_code=403, detail="Not your order")
-    return order
-
+    return enrich_order(order)
 
 @router.put("/{order_id}/status", response_model=OrderOut)
 def update_order_status(
@@ -136,10 +150,47 @@ def update_order_status(
 
     order.status = new_status
     db.add(TrackingEvent(order_id=order.id, status=new_status))
+
+    if new_status == OrderStatusEnum.cancelled:
+        for item in order.items:
+            seller_stock = (
+                db.query(Inventory)
+                .filter(
+                    Inventory.owner_id == order.seller_id,
+                    Inventory.medicine_id == item.medicine_id,
+                )
+                .first()
+            )
+            if seller_stock:
+                seller_stock.stock += item.quantity
+
+    if new_status == OrderStatusEnum.delivered:
+        for item in order.items:
+            buyer_stock = (
+                db.query(Inventory)
+                .filter(
+                    Inventory.owner_id == order.buyer_id,
+                    Inventory.medicine_id == item.medicine_id,
+                    Inventory.is_dealer_stock == False,
+                )
+                .first()
+            )
+            if buyer_stock:
+                buyer_stock.stock += item.quantity
+            else:
+                new_stock = Inventory(
+                    owner_id=order.buyer_id,
+                    medicine_id=item.medicine_id,
+                    price=item.price,
+                    stock=item.quantity,
+                    expiry_date=None,
+                    is_dealer_stock=False,
+                )
+                db.add(new_stock)
+
     db.commit()
     db.refresh(order)
-    return order
-
+    return enrich_order(order)
 
 @router.get("/{order_id}/tracking")
 def get_order_tracking(
