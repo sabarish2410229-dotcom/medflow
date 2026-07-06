@@ -41,22 +41,45 @@ def create_order(
     db.refresh(new_order)
 
     for item in order_in.items:
+        # Look up the seller's actual inventory for this medicine — never trust price from the client
+        seller_stock = (
+            db.query(Inventory)
+            .filter(
+                Inventory.owner_id == order_in.seller_id,
+                Inventory.medicine_id == item.medicine_id,
+            )
+            .first()
+        )
+        if not seller_stock:
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Seller does not stock medicine id {item.medicine_id}",
+            )
+        if seller_stock.stock < item.quantity:
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Only {seller_stock.stock} units available for this medicine",
+            )
+
         order_item = OrderItem(
             order_id=new_order.id,
             medicine_id=item.medicine_id,
             quantity=item.quantity,
-            price=item.price,
+            price=seller_stock.price,  # real price from DB, not client input
         )
         db.add(order_item)
 
-    # Log the initial tracking event
+        # Reserve the stock immediately so it can't be oversold while the order is pending
+        seller_stock.stock -= item.quantity
+
     tracking = TrackingEvent(order_id=new_order.id, status=OrderStatusEnum.created)
     db.add(tracking)
 
     db.commit()
     db.refresh(new_order)
     return new_order
-
 
 @router.get("/mine", response_model=List[OrderOut])
 def get_my_orders(

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -28,6 +28,8 @@ export const deleteInventory = (id) => api.delete(`/inventory/${id}`);
 // ---------- PROCUREMENT ----------
 export const searchAndRecommend = (medicineName) =>
   api.get(`/procurement/search?medicine_name=${encodeURIComponent(medicineName)}`);
+export const getMedicineSuggestions = (query) =>
+  api.get(`/procurement/suggestions?q=${encodeURIComponent(query)}`);
 
 // ---------- ORDERS ----------
 export const createOrder = (data) => api.post("/orders/", data);

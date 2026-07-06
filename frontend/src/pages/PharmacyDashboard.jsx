@@ -6,6 +6,7 @@ import {
   addInventory,
   deleteInventory,
   searchAndRecommend,
+  getMedicineSuggestions,
   createOrder,
   getMyOrders,
   getOrderTracking,
@@ -167,18 +168,38 @@ function InventoryTab() {
 
 function SearchTab() {
   const [medicineName, setMedicineName] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [orderMsg, setOrderMsg] = useState("");
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const handleInputChange = async (e) => {
+    const value = e.target.value;
+    setMedicineName(value);
+
+    if (value.length >= 2) {
+      try {
+        const res = await getMedicineSuggestions(value);
+        setSuggestions(res.data);
+        setShowSuggestions(true);
+      } catch (err) {
+        setSuggestions([]);
+      }
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const runSearch = async (name) => {
     setError("");
     setOrderMsg("");
+    setShowSuggestions(false);
     setLoading(true);
     try {
-      const res = await searchAndRecommend(medicineName);
+      const res = await searchAndRecommend(name);
       setResults(res.data);
     } catch (err) {
       setResults([]);
@@ -186,6 +207,16 @@ function SearchTab() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    runSearch(medicineName);
+  };
+
+  const handleSuggestionClick = (name) => {
+    setMedicineName(name);
+    runSearch(name);
   };
 
   const handleOrder = async (result, quantity) => {
@@ -211,14 +242,36 @@ function SearchTab() {
   return (
     <div style={styles.section}>
       <h3>Search Medicine & Get Recommendations</h3>
-      <form onSubmit={handleSearch} style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-        <input
-          placeholder="Medicine name (e.g. Paracetamol)"
-          value={medicineName}
-          onChange={(e) => setMedicineName(e.target.value)}
-          required
-          style={{ ...styles.input, flex: 1 }}
-        />
+      <form onSubmit={handleSearch} style={{ display: "flex", gap: "10px", marginTop: "12px", position: "relative" }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <input
+            placeholder="Medicine name (e.g. Paracetamol)"
+            value={medicineName}
+            onChange={handleInputChange}
+            onFocus={() => medicineName.length >= 2 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            required
+            style={{ ...styles.input, width: "100%" }}
+            autoComplete="off"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={styles.suggestionsBox}>
+              {suggestions.map((s) => (
+                <div
+                  key={s.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSuggestionClick(s.name);
+                  }}
+                  style={styles.suggestionItem}
+                >
+                  <strong>{s.name}</strong>
+                  {s.category && <span style={{ color: "#888", marginLeft: "8px", fontSize: "12px" }}>{s.category}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <button type="submit" style={styles.addBtn}>Search</button>
       </form>
 
@@ -326,4 +379,23 @@ const styles = {
   section: { marginTop: "20px", background: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
   error: { background: "#fee2e2", color: "#b91c1c", padding: "10px", borderRadius: "4px", marginTop: "10px" },
   success: { background: "#dcfce7", color: "#166534", padding: "10px", borderRadius: "4px", marginTop: "10px" },
+  suggestionsBox: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "6px",
+    marginTop: "4px",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+    zIndex: 10,
+    maxHeight: "200px",
+    overflowY: "auto",
+  },
+  suggestionItem: {
+    padding: "10px 14px",
+    cursor: "pointer",
+    borderBottom: "1px solid #f3f4f6",
+  },
 };
