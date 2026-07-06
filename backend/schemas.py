@@ -30,7 +30,16 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
 
 class Token(BaseModel):
     access_token: str
@@ -94,6 +103,8 @@ class RecommendationResult(BaseModel):
     medicine_id: int
     price: float
     score: float
+    ahp_score: Optional[float] = None
+    ml_probability: Optional[float] = None
     reasons: List[str]
 
 # ---------- ORDERS ----------

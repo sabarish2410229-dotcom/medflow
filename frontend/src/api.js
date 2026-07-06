@@ -57,4 +57,8 @@ export const getMyExchangeListings = () => api.get("/exchange/mine");
 export const purchaseExchangeStock = (inventoryId, quantity) =>
   api.post(`/exchange/${inventoryId}/purchase?quantity=${quantity}`);
 
+export const getMyProfile = () => api.get("/auth/me");
+export const updateMyProfile = (data) => api.put("/auth/me", data);
+export const changePassword = (data) => api.put("/auth/me/password", data);
+
 export default api;

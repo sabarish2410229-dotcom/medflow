@@ -1,3 +1,5 @@
+import os
+import pickle
 import numpy as np
 
 # Saaty's fundamental scale pairwise comparison matrix
@@ -17,6 +19,41 @@ CRITERIA_NAMES = ["price", "delivery_time", "rating", "stock"]
 # Random Index values for consistency ratio calculation (Saaty's table)
 RANDOM_INDEX = {1: 0, 2: 0, 3: 0.58, 4: 0.9, 5: 1.12, 6: 1.24, 7: 1.32, 8: 1.41}
 
+# ---------- ML fulfillment prediction (Phase 2 layer) ----------
+
+_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "ml", "fulfillment_model.pkl")
+_ml_model = None
+
+
+def _load_ml_model():
+    global _ml_model
+    if _ml_model is None:
+        try:
+            with open(_MODEL_PATH, "rb") as f:
+                _ml_model = pickle.load(f)
+        except FileNotFoundError:
+            _ml_model = False  # mark as "tried and failed" so we don't retry every call
+    return _ml_model if _ml_model is not False else None
+
+
+def predict_fulfillment_probability(price: float, stock: int, delivery_days: int, rating: float):
+    """
+    Returns the ML model's predicted probability (0-1) that this dealer will
+    fulfill an order on time, based on historical patterns. Returns None if
+    the model file isn't available (e.g. cold start, or model not yet trained) —
+    callers should fall back to pure AHP scoring in that case.
+    """
+    model = _load_ml_model()
+    if model is None:
+        return None
+    try:
+        proba = model.predict_proba([[price, stock, delivery_days, rating]])[0][1]
+        return round(float(proba), 4)
+    except Exception:
+        return None
+
+
+# ---------- AHP core ----------
 
 def calculate_ahp_weights(matrix: np.ndarray = DEFAULT_COMPARISON_MATRIX):
     """
@@ -60,12 +97,25 @@ def normalize_scores(values, lower_is_better=False):
         return (values - values.min()) / (values.max() - values.min())
 
 
+# ---------- Combined AHP + ML scoring ----------
+
+# How much the ML fulfillment prediction influences the final score.
+# AHP remains dominant (70%) so the recommendation stays explainable;
+# ML (30%) refines it using historical fulfillment patterns when available.
+ML_BLEND_WEIGHT = 0.3
+AHP_BLEND_WEIGHT = 1 - ML_BLEND_WEIGHT
+
+
 def score_suppliers(suppliers: list[dict]):
     """
     suppliers: list of dicts, each with keys:
         dealer_id, dealer_name, inventory_id, price, stock, rating, delivery_days
 
     Returns a ranked list of suppliers with scores and explanation reasons.
+    Uses AHP as the base, explainable score. If a trained ML model is available,
+    blends in a fulfillment-probability prediction for a more data-driven ranking.
+    Falls back to pure AHP if the ML model isn't available (cold start) —
+    matching the Phase 1 -> Phase 2 evolution described in the project spec.
     """
     weights, consistency_ratio = calculate_ahp_weights()
 
@@ -80,13 +130,26 @@ def score_suppliers(suppliers: list[dict]):
     stock_scores = normalize_scores(stocks, lower_is_better=False)
 
     results = []
+
     for i, supplier in enumerate(suppliers):
-        final_score = (
+        ahp_score = (
             weights[0] * price_scores[i]
             + weights[1] * delivery_scores[i]
             + weights[2] * rating_scores[i]
             + weights[3] * stock_scores[i]
         )
+
+        ml_probability = predict_fulfillment_probability(
+            price=supplier["price"],
+            stock=supplier["stock"],
+            delivery_days=supplier["delivery_days"],
+            rating=supplier["rating"],
+        )
+
+        if ml_probability is not None:
+            final_score = (AHP_BLEND_WEIGHT * ahp_score) + (ML_BLEND_WEIGHT * ml_probability)
+        else:
+            final_score = ahp_score  # cold start / no model: pure AHP
 
         reasons = []
         if prices[i] == min(prices):
@@ -97,6 +160,8 @@ def score_suppliers(suppliers: list[dict]):
             reasons.append("Highest Rating")
         if stocks[i] == max(stocks):
             reasons.append("Most Stock Available")
+        if ml_probability is not None and ml_probability >= 0.75:
+            reasons.append("High Predicted Fulfillment Reliability")
         if not reasons:
             reasons.append("Balanced option across criteria")
 
@@ -106,6 +171,8 @@ def score_suppliers(suppliers: list[dict]):
             "inventory_id": supplier["inventory_id"],
             "price": supplier["price"],
             "score": round(float(final_score), 4),
+            "ahp_score": round(float(ahp_score), 4),
+            "ml_probability": ml_probability,
             "reasons": reasons,
         })
 

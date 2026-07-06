@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import PharmacyDashboard from "./pages/PharmacyDashboard";
 import DealerDashboard from "./pages/DealerDashboard";
 import Exchange from "./pages/Exchange";
+import Settings from "./pages/Settings";
 
 function ProtectedRoute({ children, allowedRole }) {
   const { user, loading } = useAuth();
@@ -48,6 +49,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRole="pharmacy">
             <Exchange />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
           </ProtectedRoute>
         }
       />
