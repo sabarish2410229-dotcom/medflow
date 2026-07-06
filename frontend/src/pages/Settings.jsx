@@ -59,99 +59,207 @@ export default function Settings() {
 
   return (
     <Layout>
-      <h2 style={{ marginBottom: "24px" }}>Settings</h2>
-
-      <div style={styles.card}>
-        <h3 style={styles.cardTitle}>Profile Information</h3>
-        <p style={styles.roleTag}>{user?.role === "pharmacy" ? "Pharmacy Account" : "Dealer Account"}</p>
-
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <form onSubmit={handleSaveProfile}>
-            {saveMsg && <div style={styles.success}>{saveMsg}</div>}
-            {saveErr && <div style={styles.error}>{saveErr}</div>}
-
-            <label style={styles.label}>Name</label>
-            <input name="name" value={profile.name} onChange={handleProfileChange} style={styles.input} />
-
-            <label style={styles.label}>Email</label>
-            <input value={user?.email || ""} disabled style={{ ...styles.input, background: "#f8fafc", color: "#94a3b8" }} />
-
-            <label style={styles.label}>Phone</label>
-            <input name="phone" value={profile.phone} onChange={handleProfileChange} style={styles.input} />
-
-            <label style={styles.label}>Address</label>
-            <input name="address" value={profile.address} onChange={handleProfileChange} style={styles.input} />
-
-            <button type="submit" style={styles.saveBtn}>Save Changes</button>
-          </form>
-        )}
+      <div style={styles.header} className="animate-fade-in">
+        <h2 style={styles.title}>Settings</h2>
+        <p style={styles.subtitle}>Manage your account profiles, contact details, and password credentials.</p>
       </div>
 
-      <div style={styles.card}>
-        <h3 style={styles.cardTitle}>Change Password</h3>
-        <form onSubmit={handleChangePassword}>
-          {pwMsg && <div style={styles.success}>{pwMsg}</div>}
-          {pwErr && <div style={styles.error}>{pwErr}</div>}
+      <div style={styles.settingsGrid} className="animate-fade-in">
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Profile Information</h3>
+          <span style={styles.roleTag}>
+            {user?.role === "pharmacy" ? "🏥 Pharmacy Account" : "🚚 Dealer Account"}
+          </span>
 
-          <label style={styles.label}>Current Password</label>
-          <input
-            type="password"
-            name="current_password"
-            value={pwForm.current_password}
-            onChange={handlePwChange}
-            required
-            style={styles.input}
-          />
+          {loading ? (
+            <div style={styles.loadingContainer}>
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" style={{ animation: "spin 0.8s linear infinite" }}>
+                <circle cx="12" cy="12" r="10" stroke="#4f46e5" strokeWidth="3" style={{ opacity: 0.25 }} />
+                <path fill="#4f46e5" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span style={{ marginLeft: "10px", color: "#64748b" }}>Loading profile...</span>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveProfile} style={styles.form}>
+              {saveMsg && <div style={styles.success}>✓ {saveMsg}</div>}
+              {saveErr && <div style={styles.error}>⚠️ {saveErr}</div>}
 
-          <label style={styles.label}>New Password</label>
-          <input
-            type="password"
-            name="new_password"
-            value={pwForm.new_password}
-            onChange={handlePwChange}
-            required
-            style={styles.input}
-          />
+              <div>
+                <label style={styles.label}>Name / Organization Name</label>
+                <input name="name" value={profile.name} onChange={handleProfileChange} style={styles.input} required />
+              </div>
 
-          <button type="submit" style={styles.saveBtn}>Update Password</button>
-        </form>
+              <div>
+                <label style={styles.label}>Email Address (Read-only)</label>
+                <input value={user?.email || ""} disabled style={{ ...styles.input, background: "#f8fafc", color: "#94a3b8", borderStyle: "dashed" }} />
+              </div>
+
+              <div>
+                <label style={styles.label}>Phone Number</label>
+                <input name="phone" value={profile.phone} onChange={handleProfileChange} style={styles.input} placeholder="e.g. +91 98765 43210" />
+              </div>
+
+              <div>
+                <label style={styles.label}>Office / Facility Address</label>
+                <input name="address" value={profile.address} onChange={handleProfileChange} style={styles.input} placeholder="e.g. MG Road, Bengaluru" />
+              </div>
+
+              <button type="submit" style={styles.saveBtn}>Save Profile Changes</button>
+            </form>
+          )}
+        </div>
+
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Change Password</h3>
+          <p style={{ color: "#64748b", fontSize: "13px", marginBottom: "20px" }}>Change your login credentials to protect your database access.</p>
+          
+          <form onSubmit={handleChangePassword} style={styles.form}>
+            {pwMsg && <div style={styles.success}>✓ {pwMsg}</div>}
+            {pwErr && <div style={styles.error}>⚠️ {pwErr}</div>}
+
+            <div>
+              <label style={styles.label}>Current Password</label>
+              <input
+                type="password"
+                name="current_password"
+                value={pwForm.current_password}
+                onChange={handlePwChange}
+                required
+                style={styles.input}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div>
+              <label style={styles.label}>New Password</label>
+              <input
+                type="password"
+                name="new_password"
+                value={pwForm.new_password}
+                onChange={handlePwChange}
+                required
+                style={styles.input}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <button type="submit" style={styles.saveBtn}>Update Password</button>
+          </form>
+        </div>
       </div>
     </Layout>
   );
 }
 
 const styles = {
+  header: {
+    marginBottom: "24px",
+  },
+  title: {
+    fontSize: "24px",
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: "-0.03em",
+  },
+  subtitle: {
+    fontSize: "13px",
+    color: "#64748b",
+    marginTop: "4px",
+  },
+  settingsGrid: {
+    display: "flex",
+    gap: "24px",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+  },
   card: {
     background: "#fff",
-    borderRadius: "12px",
+    borderRadius: "8px",
     padding: "28px",
-    marginBottom: "20px",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-    maxWidth: "480px",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+    flex: "1 1 400px",
+    maxWidth: "520px",
   },
-  cardTitle: { marginBottom: "4px", fontSize: "17px" },
-  roleTag: { color: "#94a3b8", fontSize: "13px", marginBottom: "20px" },
-  label: { display: "block", marginTop: "14px", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: "#334155" },
+  cardTitle: {
+    fontSize: "16px",
+    fontWeight: "750",
+    color: "#0f172a",
+    marginBottom: "8px",
+  },
+  roleTag: {
+    display: "inline-block",
+    fontSize: "11px",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    padding: "3px 8px",
+    borderRadius: "4px",
+    background: "#f1f5f9",
+    color: "#4f46e5",
+    border: "1px solid #e2e8f0",
+    marginBottom: "20px",
+  },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
+  },
+  label: {
+    display: "block",
+    marginBottom: "6px",
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "#475569",
+  },
   input: {
     width: "100%",
-    padding: "10px 12px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "8px",
+    padding: "9px 12px",
+    border: "1px solid #cbd5e1",
+    borderRadius: "6px",
     fontSize: "14px",
+    color: "#0f172a",
+    background: "#fff",
+    outline: "none",
+    transition: "all 0.15s ease",
   },
   saveBtn: {
-    marginTop: "20px",
-    padding: "10px 20px",
+    marginTop: "8px",
+    padding: "9px 16px",
     background: "#4f46e5",
     color: "#fff",
     border: "none",
-    borderRadius: "8px",
+    borderRadius: "6px",
     cursor: "pointer",
     fontWeight: "600",
-    fontSize: "14px",
+    fontSize: "13px",
+    boxShadow: "0 1px 2px rgba(79, 70, 229, 0.05)",
+    width: "fit-content",
+    alignSelf: "flex-start",
+    transition: "all 0.15s ease",
   },
-  success: { background: "#dcfce7", color: "#166534", padding: "10px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px" },
-  error: { background: "#fee2e2", color: "#b91c1c", padding: "10px", borderRadius: "6px", marginBottom: "12px", fontSize: "13px" },
+  success: {
+    background: "#f0fdf4",
+    color: "#166534",
+    padding: "10px 14px",
+    borderRadius: "6px",
+    fontSize: "13px",
+    border: "1px solid #dcfce7",
+    fontWeight: "500",
+  },
+  error: {
+    background: "#fff1f2",
+    color: "#b91c1c",
+    padding: "10px 14px",
+    borderRadius: "6px",
+    fontSize: "13px",
+    border: "1px solid #fecaca",
+    fontWeight: "500",
+  },
+  loadingContainer: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "30px 0",
+  },
 };
