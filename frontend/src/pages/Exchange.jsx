@@ -1,43 +1,62 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getExchangeListings, getMyExchangeListings, purchaseExchangeStock } from "../api";
+import {
+  getExchangeListings,
+  getMyExchangeListings,
+  createExchangeRequest,
+  getIncomingRequests,
+  getMyRequests,
+  acceptExchangeRequest,
+  rejectExchangeRequest,
+  cancelExchangeRequest,
+} from "../api";
 import { useNavigate } from "react-router-dom";
-import Layout from "../components/Layout";
+import RequestTimeline from "../components/RequestTimeline";
 
 export default function Exchange() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
 
   return (
-    <Layout>
-      <div style={styles.dashboardHeader} className="animate-fade-in">
+    <div style={{ padding: "30px", maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
+          <h2 style={{ margin: 0 }}>Near-Expiry Exchange</h2>
           <button onClick={() => navigate("/pharmacy")} style={styles.backLink}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "4px" }}>
-              <line x1="19" y1="12" x2="5" y2="12"/>
-              <polyline points="12 19 5 12 12 5"/>
-            </svg>
-            Back to Dashboard
+            ← Back to Dashboard
           </button>
-          <h2 style={styles.dashboardTitle}>Near-Expiry Medicine Exchange</h2>
-          <p style={styles.dashboardSubtitle}>Browse discounted stocks from other pharmacies or trade your own inventory before expiry.</p>
+        </div>
+        <div>
+          <span style={{ marginRight: "12px" }}>Hi, {user?.name}</span>
+          <button onClick={logout} style={{ padding: "6px 14px", cursor: "pointer" }}>
+            Logout
+          </button>
         </div>
       </div>
 
-      <div style={styles.tabBar}>
+      <div style={{ marginTop: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
         <TabButton active={activeTab === "browse"} onClick={() => setActiveTab("browse")}>
-          🌐 Browse Listings
+          Browse Listings
         </TabButton>
         <TabButton active={activeTab === "mine"} onClick={() => setActiveTab("mine")}>
-          📦 My Near-Expiry Stock
+          My Near-Expiry Stock
+        </TabButton>
+        <TabButton active={activeTab === "incoming"} onClick={() => setActiveTab("incoming")}>
+          Incoming Orders
+        </TabButton>
+        <TabButton active={activeTab === "myorders"} onClick={() => setActiveTab("myorders")}>
+          My Orders
         </TabButton>
       </div>
 
-      <div className="animate-fade-in" style={{ marginTop: "24px" }}>
+      <div style={{ marginTop: "20px" }}>
         {activeTab === "browse" && <BrowseTab />}
         {activeTab === "mine" && <MyListingsTab />}
+        {activeTab === "incoming" && <IncomingOrdersTab />}
+        {activeTab === "myorders" && <MyOrdersTab />}
       </div>
-    </Layout>
+    </div>
   );
 }
 
@@ -46,11 +65,13 @@ function TabButton({ active, onClick, children }) {
     <button
       onClick={onClick}
       style={{
-        ...styles.tabButton,
-        background: active ? "#4f46e5" : "transparent",
-        color: active ? "#fff" : "#64748b",
-        fontWeight: active ? "600" : "500",
-        boxShadow: active ? "0 4px 12px rgba(79, 70, 229, 0.15)" : "none",
+        padding: "8px 16px",
+        border: "none",
+        borderRadius: "6px",
+        cursor: "pointer",
+        background: active ? "#2563eb" : "#e5e7eb",
+        color: active ? "#fff" : "#374151",
+        fontWeight: active ? "600" : "400",
       }}
     >
       {children}
@@ -61,6 +82,17 @@ function TabButton({ active, onClick, children }) {
 function daysUntil(dateStr) {
   const diff = new Date(dateStr) - new Date();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function statusStyle(status) {
+  const map = {
+    pending: { bg: "#fef9c3", color: "#854d0e" },
+    accepted: { bg: "#dcfce7", color: "#166534" },
+    rejected: { bg: "#fee2e2", color: "#b91c1c" },
+    cancelled: { bg: "#f1f5f9", color: "#64748b" },
+    completed: { bg: "#dbeafe", color: "#1e40af" },
+  };
+  return map[status] || map.pending;
 }
 
 function BrowseTab() {
@@ -89,7 +121,7 @@ function BrowseTab() {
     setQuantities({ ...quantities, [id]: value });
   };
 
-  const handlePurchase = async (listing) => {
+  const handleSendRequest = async (listing) => {
     setError("");
     setSuccessMsg("");
     const qty = parseInt(quantities[listing.id]) || 1;
@@ -100,347 +132,368 @@ function BrowseTab() {
     }
 
     try {
-      await purchaseExchangeStock(listing.id, qty);
-      setSuccessMsg(`Successfully purchased ${qty} units of ${listing.medicine.name}!`);
-      loadListings();
+      await createExchangeRequest(listing.id, qty);
+      setSuccessMsg(`Request sent to ${listing.owner_name} for ${qty} units of ${listing.medicine.name}!`);
     } catch (err) {
-      setError(err.response?.data?.detail || "Purchase failed");
+      setError(err.response?.data?.detail || "Failed to send request");
     }
   };
 
-  if (loading) return (
-    <div style={styles.cardSection}>
-      <div style={styles.loadingContainer}>
-        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" style={{ animation: "spin 0.8s linear infinite" }}>
-          <circle cx="12" cy="12" r="10" stroke="#4f46e5" strokeWidth="3" style={{ opacity: 0.25 }} />
-          <path fill="#4f46e5" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        <span style={{ marginLeft: "10px", color: "#64748b" }}>Loading listings...</span>
-      </div>
-    </div>
-  );
+  if (loading) return <div style={styles.section}><p>Loading listings...</p></div>;
 
   return (
-    <div style={styles.cardSection}>
-      <h3 style={styles.sectionTitle}>Available Exchange Medicine Stocks</h3>
+    <div style={styles.section}>
+      <h3>Near-Expiry Medicine from Other Pharmacies</h3>
       {error && <div style={styles.error}>{error}</div>}
       {successMsg && <div style={styles.success}>{successMsg}</div>}
 
       {listings.length === 0 && (
-        <p style={{ color: "#64748b", marginTop: "16px", textAlign: "center", padding: "40px 0" }}>
+        <p style={{ color: "#666", marginTop: "12px" }}>
           No near-expiry listings available right now.
         </p>
       )}
 
-      <div style={styles.listingsGrid}>
-        {listings.map((listing) => {
-          const days = daysUntil(listing.expiry_date);
-          return (
-            <div key={listing.id} style={styles.listingCard}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "12px" }}>
-                <div>
-                  <h4 style={styles.medicineTitle}>{listing.medicine.name}</h4>
-                  <span style={styles.categoryBadge}>{listing.medicine.category || "General"}</span>
-                </div>
-                <span style={styles.expiryBadge(days)}>
-                  ⏳ {days} day{days !== 1 ? "s" : ""} left
-                </span>
-              </div>
-
-              <div style={styles.listingDetails}>
-                <div style={styles.detailRow}>
-                  <span>Price:</span>
-                  <strong>₹{listing.price} / unit</strong>
-                </div>
-                <div style={styles.detailRow}>
-                  <span>Stock:</span>
-                  <strong>{listing.stock} units</strong>
-                </div>
-                <div style={{ ...styles.detailRow, borderTop: "1px dashed #f1f5f9", paddingTop: "8px", marginTop: "8px" }}>
-                  <span>Seller:</span>
-                  <span>{listing.owner_name}</span>
-                </div>
+      {listings.map((listing) => {
+        const days = daysUntil(listing.expiry_date);
+        return (
+          <div key={listing.id} style={styles.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h4 style={{ margin: 0 }}>{listing.medicine.name}</h4>
+                <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
+                  {listing.medicine.category || "-"} · ₹{listing.price}/unit · {listing.available_quantity} units available
+                  {listing.reserved_quantity > 0 && (
+                    <span style={{ color: "#d97706" }}> ({listing.reserved_quantity} reserved)</span>
+                  )}
+                </p>
+                <p style={{ margin: "4px 0", color: "#333", fontSize: "13px", fontWeight: "600" }}>
+                  Seller: {listing.owner_name}
+                </p>
                 {listing.owner_phone && (
-                  <div style={styles.metaRow}>📞 {listing.owner_phone}</div>
+                  <p style={{ margin: "2px 0", color: "#777", fontSize: "12px" }}>📞 {listing.owner_phone}</p>
                 )}
                 {listing.owner_address && (
-                  <div style={styles.metaRow}>📍 {listing.owner_address}</div>
+                  <p style={{ margin: "2px 0", color: "#777", fontSize: "12px" }}>📍 {listing.owner_address}</p>
                 )}
               </div>
-
-              <div style={styles.listingAction}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                  <input
-                    type="number"
-                    min="1"
-                    max={listing.stock}
-                    value={quantities[listing.id] || 1}
-                    onChange={(e) => handleQtyChange(listing.id, e.target.value)}
-                    style={styles.qtyInput}
-                  />
-                  <button onClick={() => handlePurchase(listing)} style={styles.buyBtn}>
-                    Buy Discounted
-                  </button>
-                </div>
-              </div>
+              <span style={styles.expiryBadge(days)}>
+                Expires in {days} day{days !== 1 ? "s" : ""}
+              </span>
             </div>
-          );
-        })}
-      </div>
+
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <label style={{ fontSize: "13px" }}>Qty:</label>
+              <input
+                type="number"
+                min="1"
+                max={listing.available_quantity}
+                value={quantities[listing.id] || 1}
+                onChange={(e) => handleQtyChange(listing.id, e.target.value)}
+                style={styles.qtyInput}
+              />
+              <button onClick={() => handleSendRequest(listing)} style={styles.requestBtn}>
+                Send Request
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function MyListingsTab() {
-  const [listings, setLoadingListings] = useState([]);
+  const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
     getMyExchangeListings()
-      .then((res) => setLoadingListings(res.data))
+      .then((res) => setListings(res.data))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
   }, []);
 
-  if (loading) return (
-    <div style={styles.cardSection}>
-      <div style={styles.loadingContainer}>
-        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" style={{ animation: "spin 0.8s linear infinite" }}>
-          <circle cx="12" cy="12" r="10" stroke="#4f46e5" strokeWidth="3" style={{ opacity: 0.25 }} />
-          <path fill="#4f46e5" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        <span style={{ marginLeft: "10px", color: "#64748b" }}>Loading your listings...</span>
-      </div>
-    </div>
-  );
+  if (loading) return <div style={styles.section}><p>Loading...</p></div>;
 
   return (
-    <div style={styles.cardSection}>
-      <h3 style={styles.sectionTitle}>Your Stock Nearing Expiry</h3>
-      <p style={{ color: "#64748b", fontSize: "13px", marginBottom: "16px" }}>
-        ⚠️ Any inventory item within 90 days of expiry is automatically listed on the Exchange database for other pharmacies to acquire.
+    <div style={styles.section}>
+      <h3>Your Stock Nearing Expiry</h3>
+      <p style={{ color: "#666", fontSize: "13px" }}>
+        Any inventory within 90 days of expiry is automatically visible to other pharmacies on the exchange.
       </p>
 
       {listings.length === 0 && (
-        <p style={{ color: "#64748b", marginTop: "16px", textAlign: "center", padding: "40px 0" }}>
-          None of your inventory items are currently near expiry.
+        <p style={{ color: "#666", marginTop: "12px" }}>
+          None of your inventory is currently near expiry.
         </p>
       )}
 
-      <div style={styles.listingsGrid}>
-        {listings.map((listing) => {
-          const days = daysUntil(listing.expiry_date);
+      {listings.map((listing) => {
+        const days = daysUntil(listing.expiry_date);
+        return (
+          <div key={listing.id} style={styles.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h4 style={{ margin: 0 }}>{listing.medicine.name}</h4>
+                <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
+                  ₹{listing.price}/unit · Total stock: {listing.stock}
+                </p>
+              </div>
+              <span style={styles.expiryBadge(days)}>
+                Expires in {days} day{days !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div style={{ marginTop: "10px", display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              <StatPill label="Available" value={listing.available_quantity} color="#166534" bg="#dcfce7" />
+              <StatPill label="Reserved" value={listing.reserved_quantity} color="#854d0e" bg="#fef9c3" />
+              <StatPill label="Pending" value={listing.pending_count} color="#854d0e" bg="#fef9c3" />
+              <StatPill label="Accepted" value={listing.accepted_count} color="#166534" bg="#dcfce7" />
+              <StatPill label="Rejected" value={listing.rejected_count} color="#b91c1c" bg="#fee2e2" />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatPill({ label, value, color, bg }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+      <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "10px", background: bg, color }}>
+        {value}
+      </span>
+      <span style={{ fontSize: "12px", color: "#888" }}>{label}</span>
+    </div>
+  );
+}
+
+function IncomingOrdersTab() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [updating, setUpdating] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await getIncomingRequests();
+      setRequests(res.data);
+    } catch (err) {
+      setError("Failed to load incoming orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleAccept = async (req) => {
+    setUpdating(true);
+    setError("");
+    try {
+      await acceptExchangeRequest(req.id);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to accept request");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleReject = async (req) => {
+    if (!window.confirm(`Reject request from ${req.buyer_name}?`)) return;
+    setUpdating(true);
+    setError("");
+    try {
+      await rejectExchangeRequest(req.id);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to reject request");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) return <div style={styles.section}><p>Loading...</p></div>;
+
+  return (
+    <div style={{ display: "flex", gap: "20px" }}>
+      <div style={{ ...styles.section, flex: 1, marginTop: 0 }}>
+        <h3>Incoming Orders</h3>
+        {error && <div style={styles.error}>{error}</div>}
+        {requests.length === 0 && <p style={{ color: "#666" }}>No incoming orders yet.</p>}
+
+        {requests.map((req) => {
+          const sStyle = statusStyle(req.status);
           return (
-            <div key={listing.id} style={{ ...styles.listingCard, borderColor: "#cbd5e1", background: "#f8fafc" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <h4 style={styles.medicineTitle}>{listing.medicine.name}</h4>
-                <span style={styles.expiryBadge(days)}>
-                  ⏳ {days} day{days !== 1 ? "s" : ""} left
+            <div
+              key={req.id}
+              style={{
+                ...styles.card,
+                background: selected?.id === req.id ? "#eff6ff" : "#fff",
+                cursor: "pointer",
+              }}
+              onClick={() => setSelected(req)}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>{req.medicine.name}</h4>
+                  <p style={{ margin: "4px 0", color: "#666", fontSize: "13px" }}>
+                    Expiry not tracked per-batch in this version
+                  </p>
+                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                    Qty: {req.quantity} · Offered Value: ₹{(req.quantity * req.price).toFixed(2)}
+                  </p>
+                  <p style={{ margin: "4px 0", fontWeight: "600", fontSize: "13px" }}>
+                    From: {req.buyer_name}
+                  </p>
+                </div>
+                <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "10px", background: sStyle.bg, color: sStyle.color }}>
+                  {req.status}
                 </span>
               </div>
-              <div style={styles.listingDetails}>
-                <div style={styles.detailRow}>
-                  <span>Price:</span>
-                  <strong>₹{listing.price} / unit</strong>
+
+              {req.status === "pending" && (
+                <div style={{ marginTop: "12px", display: "flex", gap: "8px" }} onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => handleAccept(req)} disabled={updating} style={styles.acceptBtn}>
+                    Accept
+                  </button>
+                  <button onClick={() => handleReject(req)} disabled={updating} style={styles.rejectBtn}>
+                    Reject
+                  </button>
                 </div>
-                <div style={styles.detailRow}>
-                  <span>Stock Remaining:</span>
-                  <strong>{listing.stock} units</strong>
-                </div>
-              </div>
+              )}
             </div>
           );
         })}
+      </div>
+
+      <div style={{ ...styles.section, flex: 1, marginTop: 0 }}>
+        <h3>Timeline</h3>
+        {!selected && <p style={{ color: "#666" }}>Select a request to see its timeline.</p>}
+        {selected && <RequestTimeline request={selected} />}
+      </div>
+    </div>
+  );
+}
+
+function MyOrdersTab() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [updating, setUpdating] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await getMyRequests();
+      setRequests(res.data);
+    } catch (err) {
+      setError("Failed to load your orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleCancel = async (req) => {
+    if (!window.confirm(`Cancel your request for ${req.medicine.name}?`)) return;
+    setUpdating(true);
+    setError("");
+    try {
+      await cancelExchangeRequest(req.id);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to cancel request");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) return <div style={styles.section}><p>Loading...</p></div>;
+
+  return (
+    <div style={{ display: "flex", gap: "20px" }}>
+      <div style={{ ...styles.section, flex: 1, marginTop: 0 }}>
+        <h3>My Orders</h3>
+        {error && <div style={styles.error}>{error}</div>}
+        {requests.length === 0 && <p style={{ color: "#666" }}>You haven't sent any requests yet.</p>}
+
+        {requests.map((req) => {
+          const sStyle = statusStyle(req.status);
+          return (
+            <div
+              key={req.id}
+              style={{
+                ...styles.card,
+                background: selected?.id === req.id ? "#eff6ff" : "#fff",
+                cursor: "pointer",
+              }}
+              onClick={() => setSelected(req)}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>{req.medicine.name}</h4>
+                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                    Qty: {req.quantity} · Requested Value: ₹{(req.quantity * req.price).toFixed(2)}
+                  </p>
+                  <p style={{ margin: "4px 0", fontWeight: "600", fontSize: "13px" }}>
+                    Owner: {req.seller_name}
+                  </p>
+                </div>
+                <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "10px", background: sStyle.bg, color: sStyle.color }}>
+                  {req.status}
+                </span>
+              </div>
+
+              {req.status === "pending" && (
+                <div style={{ marginTop: "12px" }} onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => handleCancel(req)} disabled={updating} style={styles.rejectBtn}>
+                    Cancel Request
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ ...styles.section, flex: 1, marginTop: 0 }}>
+        <h3>Timeline</h3>
+        {!selected && <p style={{ color: "#666" }}>Select an order to see its timeline.</p>}
+        {selected && <RequestTimeline request={selected} />}
       </div>
     </div>
   );
 }
 
 const styles = {
-  dashboardHeader: {
-    marginBottom: "24px",
-  },
-  backLink: {
-    background: "none",
-    border: "none",
-    color: "#4f46e5",
-    cursor: "pointer",
-    padding: 0,
-    fontSize: "13px",
-    fontWeight: "600",
-    display: "inline-flex",
-    alignItems: "center",
-    marginBottom: "12px",
-  },
-  dashboardTitle: {
-    fontSize: "24px",
-    fontWeight: "800",
-    color: "#0f172a",
-    letterSpacing: "-0.03em",
-  },
-  dashboardSubtitle: {
-    fontSize: "13px",
-    color: "#64748b",
-    marginTop: "4px",
-  },
-  tabBar: {
-    display: "flex",
-    gap: "4px",
-    background: "#f1f5f9",
-    padding: "4px",
-    borderRadius: "6px",
-    maxWidth: "fit-content",
-    marginBottom: "24px",
-  },
-  tabButton: {
-    border: "none",
-    padding: "6px 12px",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "13px",
-    transition: "all 0.15s ease",
-  },
-  cardSection: {
-    background: "#fff",
-    padding: "20px",
-    borderRadius: "8px",
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-    marginBottom: "24px",
-  },
-  sectionTitle: {
-    fontSize: "15px",
-    fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: "12px",
-    letterSpacing: "-0.01em",
-  },
-  listingsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    gap: "16px",
-    marginTop: "16px",
-  },
-  listingCard: {
-    background: "#fff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "8px",
-    padding: "16px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-    transition: "all 0.15s ease",
-  },
-  medicineTitle: {
-    fontSize: "15px",
-    fontWeight: "700",
-    color: "#0f172a",
-    margin: 0,
-  },
-  categoryBadge: {
-    fontSize: "11px",
-    fontWeight: "500",
-    background: "#f1f5f9",
-    color: "#475569",
-    padding: "2px 6px",
-    borderRadius: "4px",
-    marginTop: "4px",
-    display: "inline-block",
-    border: "1px solid #e2e8f0",
-  },
-  listingDetails: {
-    fontSize: "13px",
-    color: "#475569",
-    margin: "12px 0",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  detailRow: {
-    display: "flex",
-    justifyContent: "space-between",
-  },
-  metaRow: {
+  section: { marginTop: "0", background: "#fff", padding: "20px", borderRadius: "8px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
+  card: { border: "1px solid #e5e7eb", borderRadius: "8px", padding: "16px", marginTop: "12px" },
+  qtyInput: { width: "60px", padding: "6px", border: "1px solid #ccc", borderRadius: "4px" },
+  buyBtn: { padding: "8px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" },
+  requestBtn: { padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" },
+  acceptBtn: { padding: "6px 14px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "13px" },
+  rejectBtn: { padding: "6px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "13px" },
+  error: { background: "#fee2e2", color: "#b91c1c", padding: "10px", borderRadius: "4px", marginTop: "10px" },
+  success: { background: "#dcfce7", color: "#166534", padding: "10px", borderRadius: "4px", marginTop: "10px" },
+  backLink: { background: "none", border: "none", color: "#2563eb", cursor: "pointer", padding: 0, fontSize: "13px", marginTop: "4px" },
+  expiryBadge: (days) => ({
     fontSize: "12px",
-    color: "#64748b",
-    marginTop: "2px",
-  },
-  listingAction: {
-    marginTop: "12px",
-    paddingTop: "12px",
-    borderTop: "1px solid #f1f5f9",
-  },
-  qtyInput: {
-    width: "60px",
-    padding: "6px 8px",
-    border: "1px solid #cbd5e1",
-    borderRadius: "6px",
-    fontSize: "13px",
-    textAlign: "center",
-    outline: "none",
-    transition: "border-color 0.15s ease",
-  },
-  buyBtn: {
-    flex: 1,
-    padding: "8px 14px",
-    background: "#10b981",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: "600",
-    boxShadow: "0 1px 2px rgba(16, 185, 129, 0.05)",
-    transition: "all 0.15s ease",
-  },
-  loadingContainer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "30px 0",
-  },
-  error: {
-    background: "#fff1f2",
-    color: "#b91c1c",
-    padding: "10px 14px",
-    borderRadius: "6px",
-    marginBottom: "16px",
-    fontSize: "13px",
-    border: "1px solid #fecaca",
-    fontWeight: "500",
-  },
-  success: {
-    background: "#f0fdf4",
-    color: "#166534",
-    padding: "10px 14px",
-    borderRadius: "6px",
-    marginBottom: "16px",
-    fontSize: "13px",
-    border: "1px solid #dcfce7",
-    fontWeight: "500",
-  },
-  expiryBadge: (days) => {
-    let background = "#f0fdf4";
-    let color = "#166534";
-    let border = "1px solid #dcfce7";
-    if (days <= 30) {
-      background = "#fff1f2";
-      color = "#b91c1c";
-      border = "1px solid #fecaca";
-    } else if (days <= 60) {
-      background = "#fffbeb";
-      color = "#b45309";
-      border = "1px solid #fde68a";
-    }
-    return {
-      fontSize: "11px",
-      fontWeight: "600",
-      padding: "2px 6px",
-      borderRadius: "4px",
-      background,
-      color,
-      border,
-      whiteSpace: "nowrap",
-    };
-  },
+    padding: "4px 10px",
+    borderRadius: "12px",
+    background: days <= 30 ? "#fee2e2" : "#fef9c3",
+    color: days <= 30 ? "#b91c1c" : "#854d0e",
+    whiteSpace: "nowrap",
+  }),
 };

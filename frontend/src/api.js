@@ -51,12 +51,22 @@ export const updateOrderStatus = (id, status) =>
   api.put(`/orders/${id}/status`, { status });
 export const getOrderTracking = (id) => api.get(`/orders/${id}/tracking`);
 
-// ---------- EXCHANGE ----------
+// ---------- EXCHANGE (listings) ----------
 export const getExchangeListings = () => api.get("/exchange/listings");
 export const getMyExchangeListings = () => api.get("/exchange/mine");
 export const purchaseExchangeStock = (inventoryId, quantity) =>
   api.post(`/exchange/${inventoryId}/purchase?quantity=${quantity}`);
 
+// ---------- EXCHANGE (requests: Incoming Orders / My Orders) ----------
+export const createExchangeRequest = (listingId, quantity) =>
+  api.post("/exchange/requests", { listing_id: listingId, quantity });
+export const getIncomingRequests = () => api.get("/exchange/requests/incoming");
+export const getMyRequests = () => api.get("/exchange/requests/mine");
+export const acceptExchangeRequest = (id) => api.put(`/exchange/requests/${id}/accept`);
+export const rejectExchangeRequest = (id) => api.put(`/exchange/requests/${id}/reject`);
+export const cancelExchangeRequest = (id) => api.put(`/exchange/requests/${id}/cancel`);
+
+// ---------- PROFILE / SETTINGS ----------
 export const getMyProfile = () => api.get("/auth/me");
 export const updateMyProfile = (data) => api.put("/auth/me", data);
 export const changePassword = (data) => api.put("/auth/me/password", data);

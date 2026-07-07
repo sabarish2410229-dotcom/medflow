@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import date, datetime
 from models import RoleEnum, OrderStatusEnum, OrderTypeEnum
-
+from models import ExchangeRequestStatusEnum
 
 # ---------- AUTH ----------
 
@@ -169,7 +169,39 @@ class ExchangeListingOut(BaseModel):
     medicine: MedicineOut
     price: float
     stock: int
+    reserved_quantity: int = 0
+    available_quantity: int = 0
+    pending_count: int = 0
+    accepted_count: int = 0
+    rejected_count: int = 0
     expiry_date: date
+
+    class Config:
+        from_attributes = True
+        
+class ExchangeRequestCreate(BaseModel):
+    listing_id: int
+    quantity: int
+
+
+class ExchangeRequestOut(BaseModel):
+    id: int
+    listing_id: int
+    buyer_id: int
+    buyer_name: str
+    seller_id: int
+    seller_name: str
+    medicine: MedicineOut
+    quantity: int
+    price: float
+    status: ExchangeRequestStatusEnum
+    linked_order_id: Optional[int] = None
+    requested_at: datetime
+    viewed_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
+    rejected_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -110,3 +110,36 @@ class RecommendationLog(Base):
     score = Column(Float, nullable=False)
     criteria_breakdown = Column(Text, nullable=True)  # store JSON as text
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+class ExchangeRequestStatusEnum(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+    cancelled = "cancelled"
+    completed = "completed"
+
+
+class ExchangeRequest(Base):
+    __tablename__ = "exchange_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, ForeignKey("inventory.id"), nullable=False)
+    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    medicine_id = Column(Integer, ForeignKey("medicines.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    price = Column(Float, nullable=False)
+    status = Column(Enum(ExchangeRequestStatusEnum), default=ExchangeRequestStatusEnum.pending)
+    linked_order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
+
+    requested_at = Column(DateTime(timezone=True), server_default=func.now())
+    viewed_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    rejected_at = Column(DateTime(timezone=True), nullable=True)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    listing = relationship("Inventory")
+    buyer = relationship("User", foreign_keys=[buyer_id])
+    seller = relationship("User", foreign_keys=[seller_id])
+    medicine = relationship("Medicine")

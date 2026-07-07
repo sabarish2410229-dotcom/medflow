@@ -12,7 +12,7 @@ export default function Layout({ children }) {
   const navItems = isPharmacy
     ? [
         { label: "Dashboard", path: "/pharmacy" },
-        { label: "Exchange", path: "/exchange" },
+        { label: "Near-Expiry Exchange", path: "/exchange" },
       ]
     : [{ label: "Dashboard", path: "/dealer" }];
 
@@ -35,20 +35,33 @@ export default function Layout({ children }) {
           </div>
 
           <div style={styles.navLinks}>
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                style={{
-                  ...styles.navLink,
-                  color: location.pathname === item.path ? "#0f172a" : "#475569",
-                  fontWeight: "600",
-                  backgroundColor: location.pathname === item.path ? "#f1f5f9" : "transparent",
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const isExchange = item.path === "/exchange";
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  style={
+                    isExchange
+                      ? {
+                          ...styles.navLink,
+                          background: "#f59e0b",
+                          color: "#fff",
+                          fontWeight: "600",
+                          borderRadius: "6px",
+                        }
+                      : {
+                          ...styles.navLink,
+                          color: isActive ? "#4f46e5" : "#64748b",
+                          fontWeight: isActive ? "600" : "500",
+                        }
+                  }
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
 
           <div style={styles.navRight}>

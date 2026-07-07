@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
 import {
@@ -18,7 +17,6 @@ import OrderTimeline from "../components/OrderTimeline";
 
 export default function PharmacyDashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("inventory");
 
   return (
@@ -28,15 +26,6 @@ export default function PharmacyDashboard() {
           <h2 style={styles.dashboardTitle}>Pharmacy Portal</h2>
           <p style={styles.dashboardSubtitle}>Manage your medicine stock, procurements, and check status timeline.</p>
         </div>
-        <button
-          onClick={() => navigate("/exchange")}
-          style={styles.exchangeBtn}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: "6px" }}>
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-          </svg>
-          Near-Expiry Exchange
-        </button>
       </div>
 
       <div style={styles.tabBar}>
@@ -388,7 +377,10 @@ function OrdersTab() {
   const loadOrders = async () => {
     try {
       const res = await getMyOrders();
-      setOrders(res.data);
+      // Only show procurement (dealer) orders here — exchange orders live in
+      // the Near-Expiry Exchange page's own My Orders / Incoming Orders tabs.
+      const dealerOrders = res.data.filter((o) => o.order_type === "procurement");
+      setOrders(dealerOrders);
     } catch (err) {
       console.error(err);
     } finally {
@@ -455,7 +447,7 @@ function OrdersTab() {
                 </span>
               </div>
               <p style={{ fontSize: "13px", color: "#334155", margin: "8px 0 4px", fontWeight: "500" }}>
-                {order.order_type === "exchange" ? "🔄 Near-Expiry Exchange" : "🛒 Procurement"} ·{" "}
+                🛒 Procurement ·{" "}
                 {order.items.map((i) => `${i.medicine.name} (${i.quantity})`).join(", ")}
               </p>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
@@ -519,20 +511,6 @@ const styles = {
     fontSize: "13px",
     color: "#64748b",
     marginTop: "4px",
-  },
-  exchangeBtn: {
-    background: "#d97706",
-    color: "#fff",
-    border: "none",
-    padding: "8px 16px",
-    borderRadius: "6px",
-    fontWeight: "600",
-    cursor: "pointer",
-    fontSize: "13px",
-    boxShadow: "0 1px 2px rgba(217, 119, 6, 0.05)",
-    display: "flex",
-    alignItems: "center",
-    transition: "all 0.15s ease",
   },
   tabBar: {
     display: "flex",
