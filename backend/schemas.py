@@ -102,6 +102,7 @@ class RecommendationResult(BaseModel):
     inventory_id: int
     medicine_id: int
     price: float
+    stock: int
     score: float
     ahp_score: Optional[float] = None
     ml_probability: Optional[float] = None

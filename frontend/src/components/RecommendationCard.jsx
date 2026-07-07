@@ -32,8 +32,7 @@ export default function RecommendationCard({ result, rank, onOrder }) {
         <div style={{ flex: 1 }}>
           <h4 style={styles.dealerName}>{result.dealer_name}</h4>
           <div style={styles.priceContainer}>
-            <span style={styles.price}>₹{result.price}</span>
-            <span style={styles.priceUnit}> / unit</span>
+            <span style={styles.price}>₹{result.price} per unit · {result.stock} units in stock</span>
           </div>
           <div style={styles.metaContainer}>
             {result.dealer_phone && <span style={styles.metaItem}>📞 {result.dealer_phone}</span>}

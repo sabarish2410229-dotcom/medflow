@@ -240,7 +240,7 @@ function IncomingOrdersTab({ currentUserId }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [tracking, setTracking] = useState([]);
   const [loadingTracking, setLoadingTracking] = useState(false);
-  const [updating, setUpdating] = useState(false);
+  const [updatingId, setUpdatingId] = useState(null);
 
   const loadOrders = async () => {
     try {
@@ -274,8 +274,7 @@ function IncomingOrdersTab({ currentUserId }) {
   const handleAdvanceStatus = async (order) => {
     const nextStatus = NEXT_STATUS[order.status];
     if (!nextStatus) return;
-
-    setUpdating(true);
+    setUpdatingId(order.id);
     setError("");
     try {
       await updateOrderStatus(order.id, nextStatus);
@@ -288,26 +287,24 @@ function IncomingOrdersTab({ currentUserId }) {
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to update status");
     } finally {
-      setUpdating(false);
+      setUpdatingId(null);
     }
   };
 
   const handleCancelOrder = async (order) => {
     if (!window.confirm(`Cancel order #${order.id}? This will restore your reserved stock.`)) return;
-    setUpdating(true);
+    setUpdatingId(order.id);
     setError("");
     try {
       await updateOrderStatus(order.id, "cancelled");
       await loadOrders();
       if (selectedOrder?.id === order.id) {
-        const res = await getOrderTracking(order.id);
-        setTracking(res.data);
         setSelectedOrder({ ...order, status: "cancelled" });
       }
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to cancel order");
     } finally {
-      setUpdating(false);
+      setUpdatingId(null);
     }
   };
 
@@ -370,23 +367,23 @@ function IncomingOrdersTab({ currentUserId }) {
               </p>
               <div style={{ display: "flex", gap: "8px" }}>
                 {NEXT_STATUS[order.status] && (
-                  <button
-                    onClick={() => handleAdvanceStatus(order)}
-                    disabled={updating}
-                    style={styles.advanceBtn}
-                  >
-                    {updating ? "Updating..." : STATUS_BUTTON_LABEL[order.status]}
-                  </button>
-                )}
-                {(order.status === "created" || order.status === "accepted") && (
-                  <button
-                    onClick={() => handleCancelOrder(order)}
-                    disabled={updating}
-                    style={styles.cancelBtn}
-                  >
-                    Cancel Order
-                  </button>
-                )}
+                <button
+                  onClick={() => handleAdvanceStatus(order)}
+                  disabled={updatingId === order.id}
+                  style={styles.advanceBtn}
+                >
+                  {updatingId === order.id ? "Updating..." : STATUS_BUTTON_LABEL[order.status]}
+                </button>
+              )}
+              {(order.status === "created" || order.status === "accepted") && (
+                <button
+                  onClick={() => handleCancelOrder(order)}
+                  disabled={updatingId === order.id}
+                  style={styles.cancelBtn}
+                >
+                  Cancel Order
+                </button>
+              )}
               </div>
             </div>
           ))}

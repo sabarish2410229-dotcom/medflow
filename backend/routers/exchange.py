@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from database import get_db
 from models import (
@@ -17,54 +18,54 @@ router = APIRouter(prefix="/exchange", tags=["Exchange"])
 EXPIRY_WINDOW_DAYS = 90
 
 
-def get_listing_request_stats(db: Session, listing_id: int):
-    """
-    Computes live reservation stats for a listing by querying ExchangeRequest directly —
-    no separate stored counter, so this can never drift out of sync with actual requests.
-    """
-    reserved = db.query(func.coalesce(func.sum(ExchangeRequest.quantity), 0)).filter(
-        ExchangeRequest.listing_id == listing_id,
-        ExchangeRequest.status == ExchangeRequestStatusEnum.pending,
-    ).scalar() or 0
+def get_stats_map(db: Session, listing_ids: list) -> dict:
+    if not listing_ids:
+        return {}
+    rows = (
+        db.query(
+            ExchangeRequest.listing_id,
+            ExchangeRequest.status,
+            func.count(ExchangeRequest.id),
+            func.coalesce(func.sum(ExchangeRequest.quantity), 0),
+        )
+        .filter(ExchangeRequest.listing_id.in_(listing_ids))
+        .group_by(ExchangeRequest.listing_id, ExchangeRequest.status)
+        .all()
+    )
+    stats = {lid: {"reserved": 0, "pending_count": 0, "accepted_count": 0, "rejected_count": 0} for lid in listing_ids}
+    for listing_id, status, count, qty in rows:
+        if status == ExchangeRequestStatusEnum.pending:
+            stats[listing_id]["reserved"] = qty
+            stats[listing_id]["pending_count"] = count
+        elif status == ExchangeRequestStatusEnum.accepted:
+            stats[listing_id]["accepted_count"] = count
+        elif status == ExchangeRequestStatusEnum.rejected:
+            stats[listing_id]["rejected_count"] = count
+    return stats
 
-    pending_count = db.query(func.count(ExchangeRequest.id)).filter(
-        ExchangeRequest.listing_id == listing_id,
-        ExchangeRequest.status == ExchangeRequestStatusEnum.pending,
-    ).scalar() or 0
-
-    accepted_count = db.query(func.count(ExchangeRequest.id)).filter(
-        ExchangeRequest.listing_id == listing_id,
-        ExchangeRequest.status == ExchangeRequestStatusEnum.accepted,
-    ).scalar() or 0
-
-    rejected_count = db.query(func.count(ExchangeRequest.id)).filter(
-        ExchangeRequest.listing_id == listing_id,
-        ExchangeRequest.status == ExchangeRequestStatusEnum.rejected,
-    ).scalar() or 0
-
-    return reserved, pending_count, accepted_count, rejected_count
-
-
-def build_listing_dict(db: Session, item: Inventory) -> dict:
-    reserved, pending_count, accepted_count, rejected_count = get_listing_request_stats(db, item.id)
-    return {
-        "id": item.id,
-        "owner_id": item.owner_id,
-        "owner_name": item.owner.name,
-        "owner_phone": item.owner.phone,
-        "owner_address": item.owner.address,
-        "medicine": item.medicine,
-        "price": item.price,
-        "stock": item.stock,
-        "reserved_quantity": reserved,
-        "available_quantity": max(0, item.stock - reserved),
-        "pending_count": pending_count,
-        "accepted_count": accepted_count,
-        "rejected_count": rejected_count,
-        "expiry_date": item.expiry_date,
-    }
-
-
+def build_listings_response(db: Session, items: list) -> list:
+    stats_map = get_stats_map(db, [item.id for item in items])
+    results = []
+    for item in items:
+        s = stats_map.get(item.id, {"reserved": 0, "pending_count": 0, "accepted_count": 0, "rejected_count": 0})
+        results.append({
+            "id": item.id,
+            "owner_id": item.owner_id,
+            "owner_name": item.owner.name,
+            "owner_phone": item.owner.phone,
+            "owner_address": item.owner.address,
+            "medicine": item.medicine,
+            "price": item.price,
+            "stock": item.stock,
+            "reserved_quantity": s["reserved"],
+            "available_quantity": max(0, item.stock - s["reserved"]),
+            "pending_count": s["pending_count"],
+            "accepted_count": s["accepted_count"],
+            "rejected_count": s["rejected_count"],
+            "expiry_date": item.expiry_date,
+        })
+    return results
+@router.get("/listings", response_model=List[ExchangeListingOut])
 @router.get("/listings", response_model=List[ExchangeListingOut])
 def browse_near_expiry_listings(
     db: Session = Depends(get_db),
@@ -75,6 +76,10 @@ def browse_near_expiry_listings(
 
     listings = (
         db.query(Inventory)
+        .options(
+            joinedload(Inventory.owner),
+            joinedload(Inventory.medicine),
+        )
         .filter(
             Inventory.is_dealer_stock == False,
             Inventory.owner_id != current_user.id,
@@ -85,8 +90,8 @@ def browse_near_expiry_listings(
         )
         .all()
     )
-    return [build_listing_dict(db, item) for item in listings]
 
+    return build_listings_response(db, listings)
 
 @router.get("/mine", response_model=List[ExchangeListingOut])
 def my_near_expiry_listings(
@@ -98,6 +103,10 @@ def my_near_expiry_listings(
 
     listings = (
         db.query(Inventory)
+        .options(
+            joinedload(Inventory.owner),
+            joinedload(Inventory.medicine)
+        )
         .filter(
             Inventory.is_dealer_stock == False,
             Inventory.owner_id == current_user.id,
@@ -106,9 +115,9 @@ def my_near_expiry_listings(
             Inventory.expiry_date >= date.today(),
             Inventory.stock > 0,
         )
-        .all()
+        .all() 
     )
-    return [build_listing_dict(db, item) for item in listings]
+    return build_listings_response(db, listings)
 
 
 @router.post("/{inventory_id}/purchase", response_model=OrderOut)
@@ -187,7 +196,8 @@ def create_exchange_request(
 
     # Check against AVAILABLE quantity (stock minus what's already reserved by pending requests),
     # not raw stock — prevents multiple buyers over-requesting the same limited stock.
-    reserved, _, _, _ = get_listing_request_stats(db, listing.id)
+    stats = get_stats_map(db, [listing.id]).get(listing.id, {"reserved": 0})
+    reserved = stats["reserved"]
     available = listing.stock - reserved
     if available < request_in.quantity:
         raise HTTPException(

@@ -170,6 +170,7 @@ def score_suppliers(suppliers: list[dict]):
             "dealer_name": supplier["dealer_name"],
             "inventory_id": supplier["inventory_id"],
             "price": supplier["price"],
+            "stock": supplier["stock"],
             "score": round(float(final_score), 4),
             "ahp_score": round(float(ahp_score), 4),
             "ml_probability": ml_probability,

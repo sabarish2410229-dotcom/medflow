@@ -44,6 +44,34 @@ def create_order(
     if order_in.seller_id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot order from yourself")
 
+    if not order_in.items:
+        raise HTTPException(status_code=400, detail="Order must contain at least one item")
+
+    # Validate EVERY item's stock availability BEFORE creating anything in the database.
+    # This prevents partially-created "ghost" orders when validation fails midway.
+    validated_items = []
+    for item in order_in.items:
+        seller_stock = (
+            db.query(Inventory)
+            .filter(
+                Inventory.owner_id == order_in.seller_id,
+                Inventory.medicine_id == item.medicine_id,
+            )
+            .first()
+        )
+        if not seller_stock:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Seller does not stock medicine id {item.medicine_id}",
+            )
+        if seller_stock.stock < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Only {seller_stock.stock} units available for this medicine",
+            )
+        validated_items.append((item, seller_stock))
+
+    # All items passed validation — now it's safe to actually create the order.
     new_order = Order(
         buyer_id=current_user.id,
         seller_id=order_in.seller_id,
@@ -54,38 +82,14 @@ def create_order(
     db.commit()
     db.refresh(new_order)
 
-    for item in order_in.items:
-        # Look up the seller's actual inventory for this medicine — never trust price from the client
-        seller_stock = (
-            db.query(Inventory)
-            .filter(
-                Inventory.owner_id == order_in.seller_id,
-                Inventory.medicine_id == item.medicine_id,
-            )
-            .first()
-        )
-        if not seller_stock:
-            db.rollback()
-            raise HTTPException(
-                status_code=400,
-                detail=f"Seller does not stock medicine id {item.medicine_id}",
-            )
-        if seller_stock.stock < item.quantity:
-            db.rollback()
-            raise HTTPException(
-                status_code=400,
-                detail=f"Only {seller_stock.stock} units available for this medicine",
-            )
-
+    for item, seller_stock in validated_items:
         order_item = OrderItem(
             order_id=new_order.id,
             medicine_id=item.medicine_id,
             quantity=item.quantity,
-            price=seller_stock.price,  # real price from DB, not client input
+            price=seller_stock.price,
         )
         db.add(order_item)
-
-        # Reserve the stock immediately so it can't be oversold while the order is pending
         seller_stock.stock -= item.quantity
 
     tracking = TrackingEvent(order_id=new_order.id, status=OrderStatusEnum.created)

@@ -1,6 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from database import get_db
 from models import User, Medicine, Inventory
@@ -11,10 +12,11 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 
 def get_or_create_medicine(db: Session, name: str, category: Optional[str]) -> Medicine:
-    medicine = db.query(Medicine).filter(Medicine.name.ilike(name)).first()
+    clean_name = name.strip()
+    medicine = db.query(Medicine).filter(func.lower(Medicine.name) == func.lower(clean_name)).first()
     if medicine:
         return medicine
-    medicine = Medicine(name=name, category=category)
+    medicine = Medicine(name=clean_name, category=category)
     db.add(medicine)
     db.commit()
     db.refresh(medicine)
