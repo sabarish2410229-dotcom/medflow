@@ -2,7 +2,7 @@
 
 
 
-\*\*A B2B SaaS platform for pharmacy procurement and near-expiry inventory exchange\*\*
+**A B2B platform for pharmacy procurement and near-expiry inventory exchange**
 
 
 
@@ -10,11 +10,9 @@ MedFlow is a two-sided marketplace that connects independent pharmacies with pha
 
 
 
-\---
 
 
-
-\## The Problem
+**The Problem**
 
 
 
@@ -28,13 +26,11 @@ MedFlow addresses both problems in one platform: a structured procurement market
 
 
 
-
-
-\## Key Differentiators
+**Key Differentiators**
 
 
 
-\### 1. Explainable Supplier Recommendation Engine (AHP + ML)
+**1. Explainable Supplier Recommendation Engine (AHP + ML)**
 
 
 
@@ -50,7 +46,7 @@ Every recommendation shows plain-language reasons ("Lowest Price," "Fastest Deli
 
 
 
-\### 2. Near-Expiry Inventory Exchange
+2\. **Near-Expiry Inventory Exchange**
 
 
 
@@ -62,7 +58,7 @@ Reserved quantity is tracked live against total stock, so a listing's availabili
 
 
 
-\### 3. Order Lifecycle State Machine
+3\. **Order Lifecycle State Machine**
 
 
 
@@ -70,11 +66,9 @@ Every order — procurement or exchange — moves through an explicit state mach
 
 
 
-\---
 
 
-
-\## Architecture
+**Architecture**
 
 
 
@@ -116,39 +110,35 @@ PostgreSQL (Neon)
 
 
 
-\*\*Pattern:\*\* Route → Pydantic schema validation → SQLAlchemy ORM → PostgreSQL. Role-based access control (pharmacy / dealer) is enforced at the dependency level on every protected endpoint.
+**Pattern:** Route → Pydantic schema validation → SQLAlchemy ORM → PostgreSQL. Role-based access control (pharmacy / dealer) is enforced at the dependency level on every protected endpoint.
 
 
 
-\---
+
+
+**Tech Stack**
 
 
 
-\## Tech Stack
+**Backend:** Python, FastAPI, SQLAlchemy, PostgreSQL (Neon), JWT auth (python-jose), bcrypt password hashing, Pydantic validation, scikit-learn (logistic regression), NumPy (AHP matrix computation)
 
 
 
-\*\*Backend:\*\* Python, FastAPI, SQLAlchemy, PostgreSQL (Neon), JWT auth (python-jose), bcrypt password hashing, Pydantic validation, scikit-learn (logistic regression), NumPy (AHP matrix computation)
+**Frontend:** React (Vite), React Router, Axios
 
 
 
-\*\*Frontend:\*\* React (Vite), React Router, Axios
+**Infrastructure:** Neon (managed Postgres), environment-based config for deployment portability
 
 
 
-\*\*Infrastructure:\*\* Neon (managed Postgres), environment-based config for deployment portability
+
+
+**Core Features**
 
 
 
-\---
-
-
-
-\## Core Features
-
-
-
-| Module | Description |
+| **Module** | **Description** |
 
 |---|---|
 
@@ -168,15 +158,13 @@ PostgreSQL (Neon)
 
 
 
-\---
+
+
+**Local Setup**
 
 
 
-\## Local Setup
-
-
-
-\### Backend
+**Backend**
 
 
 
@@ -220,7 +208,7 @@ API docs available at `http://127.0.0.1:8000/docs`.
 
 
 
-\### Frontend
+**Frontend**
 
 
 
@@ -256,7 +244,7 @@ App available at `http://localhost:5173`.
 
 
 
-\### ML Model (optional — falls back to pure AHP if skipped)
+**ML Model** (optional — falls back to pure AHP if skipped)
 
 
 
@@ -272,11 +260,9 @@ python ml/train\_model.py
 
 
 
-\---
 
 
-
-\## Known Limitations \& Future Work
+**Known Limitations \& Future Work**
 
 
 
@@ -284,25 +270,23 @@ This project was scoped deliberately for a focused build timeline, prioritizing 
 
 
 
-\- \*\*No refresh tokens / email verification / password reset\*\* — JWTs are long-lived (24h); production auth would add token rotation and the standard account-recovery flows.
+\- **No refresh tokens / email verification / password reset** — JWTs are long-lived (24h); production auth would add token rotation and the standard account-recovery flows.
 
-\- \*\*No schema migration tool (Alembic)\*\* — schema changes during development were applied via manual `ALTER TABLE` scripts rather than tracked migrations.
+\- **No schema migration tool (Alembic)** — schema changes during development were applied via manual `ALTER TABLE` scripts rather than tracked migrations.
 
-\- \*\*No background job processing\*\* — near-expiry detection runs as a live query filter on page load rather than a scheduled job; there's no notification system for low stock or upcoming expiry.
+\- **No background job processing** — near-expiry detection runs as a live query filter on page load rather than a scheduled job; there's no notification system for low stock or upcoming expiry.
 
-\- \*\*Simplified inventory model\*\* — no batch numbers, manufacturer tracking, GST/HSN fields, or purchase-vs-selling price distinction. Real pharmacy inventory systems track medicine at the batch level; this MVP tracks it at the SKU level.
+\- **Simplified inventory model** — no batch numbers, manufacturer tracking, GST/HSN fields, or purchase-vs-selling price distinction. Real pharmacy inventory systems track medicine at the batch level; this MVP tracks it at the SKU level.
 
-\- \*\*ML model trained on synthetic data\*\* — the fulfillment-prediction model is trained on a generated dataset with realistic but artificial dealer performance patterns, since no real historical order data exists yet. It demonstrates the intended architecture (AHP-first, ML-refined, graceful fallback) rather than production-grade accuracy.
+\- **ML model trained on synthetic data** — the fulfillment-prediction model is trained on a generated dataset with realistic but artificial dealer performance patterns, since no real historical order data exists yet. It demonstrates the intended architecture (AHP-first, ML-refined, graceful fallback) rather than production-grade accuracy.
 
-\- \*\*No admin role or multi-tenant organization structure\*\* — the platform currently has two flat roles (pharmacy, dealer) rather than organization-level accounts with multiple staff members.
-
-
-
-\---
+\- **No admin role or multi-tenant organization structure** — the platform currently has two flat roles (pharmacy, dealer) rather than organization-level accounts with multiple staff members.
 
 
 
-\## Project Structure
+
+
+**Project Structure**
 
 
 
