@@ -46,7 +46,7 @@ Every recommendation shows plain-language reasons ("Lowest Price," "Fastest Deli
 
 
 
-2\. **Near-Expiry Inventory Exchange**
+**2. Near-Expiry Inventory Exchange**
 
 
 
@@ -58,7 +58,7 @@ Reserved quantity is tracked live against total stock, so a listing's availabili
 
 
 
-3\. **Order Lifecycle State Machine**
+**3.** **Order Lifecycle State Machine**
 
 
 
@@ -138,23 +138,25 @@ PostgreSQL (Neon)
 
 
 
-| **Module** | **Description** |
+**Modules and Description**
 
-|---|---|
 
-| Authentication | JWT-based auth with role-based access control (pharmacy / dealer), profile management, password change |
 
-| Inventory Management | Separate dealer and pharmacy inventories with medicine deduplication (case-insensitive matching) |
+1. **Authentication** - JWT-based auth with role-based access control (pharmacy / dealer), profile management,
 
-| Procurement \& Recommendations | Medicine search with autocomplete, AHP + ML-ranked dealer recommendations with visible stock and reasoning |
+password change 
 
-| Order Management | Full order lifecycle with state machine enforcement, cancellation with stock restoration, buyer/seller-linked views |
+**2.** **Inventory Management** - Separate dealer and pharmacy inventories with medicine deduplication (case-insensitive      matching) 
 
-| Order Tracking | Immutable, timestamped tracking history rendered as a visual timeline |
+**3.** **Procurement \& Recommendations** - Medicine search with autocomplete, AHP + ML-ranked dealer recommendations with visible stock and reasoning 
 
-| Near-Expiry Exchange | Automatic listing of near-expiry stock, structured request/accept/reject/cancel flow, live reserved/available quantity tracking |
+**4.** **Order Management** - Full order lifecycle with state machine enforcement, cancellation with stock restoration,   buyer/seller-linked views
 
-| Settings | Profile editing, password change |
+**5.** **Order Tracking** - Immutable, timestamped tracking history rendered as a visual timeline 
+
+**6.** **Near-Expiry Exchange** - Automatic listing of near-expiry stock, structured request/accept/reject/cancel flow, live reserved/available quantity tracking
+
+**7. Settings** - Profile editing, password change
 
 
 
